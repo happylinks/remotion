@@ -42,6 +42,10 @@ await buildPackage({
 			path: 'src/server-worker.module.ts',
 			target: 'node',
 		},
+		{
+			path: 'src/fetch.ts',
+			target: 'browser',
+		},
 	],
 	external: ['stream'],
 });

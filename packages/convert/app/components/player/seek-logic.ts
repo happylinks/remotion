@@ -6,23 +6,25 @@ import {
 
 export const isSeekInfeasible = (
 	frameDatabase: FrameDatabase,
+	firstFrameTime: number,
 	seekToSeconds: number,
 ) => {
 	const group = findGroupForInsertingTimestamp({
 		groups: frameDatabase._groups,
-		timestamp: seekToSeconds * WEBCODECS_TIMESCALE,
+		timestamp: firstFrameTime + seekToSeconds * WEBCODECS_TIMESCALE,
 	});
 
 	// if there are no frames yet, they will arrive
-	if (group.frames.length === 0) {
+	if (group?.frames.length === 0) {
 		return false;
 	}
 
 	// If every frame is already past the seek, we cannot do anything
-	// 0.1sec tolerance because some videos first frame is a bit bigger than 0
 	if (
 		group.frames.every(
-			(f) => f.frame.timestamp > (seekToSeconds + 0.1) * WEBCODECS_TIMESCALE,
+			(f) =>
+				f.frame.timestamp >
+				firstFrameTime + seekToSeconds * WEBCODECS_TIMESCALE,
 		)
 	) {
 		return true;
@@ -33,19 +35,24 @@ export const isSeekInfeasible = (
 
 export const isSeekAchieved = ({
 	frameDatabase,
+	firstFrameTime,
 	seekToSeconds,
 }: {
 	frameDatabase: FrameDatabase;
+	firstFrameTime: number;
 	seekToSeconds: number;
 }) => {
 	const group = findGroupForInsertingTimestamp({
 		groups: frameDatabase._groups,
-		timestamp: seekToSeconds * WEBCODECS_TIMESCALE,
+		timestamp: firstFrameTime + seekToSeconds * WEBCODECS_TIMESCALE,
 	});
 
 	const hasFrameWithin01Seconds = group.frames.some(
 		(f) =>
-			Math.abs(f.frame.timestamp - seekToSeconds * WEBCODECS_TIMESCALE) <
+			Math.abs(
+				f.frame.timestamp -
+					(firstFrameTime + seekToSeconds * WEBCODECS_TIMESCALE),
+			) <
 			0.1 * WEBCODECS_TIMESCALE,
 	);
 
@@ -58,10 +65,12 @@ export const isSeekAchieved = ({
 	// determine if there are frames before and after the seek
 	// and consider the seek done.
 	const hasFramesAfter = group.frames.some(
-		(f) => f.frame.timestamp > seekToSeconds * WEBCODECS_TIMESCALE,
+		(f) =>
+			f.frame.timestamp > firstFrameTime + seekToSeconds * WEBCODECS_TIMESCALE,
 	);
 	const hasFramesBefore = group.frames.some(
-		(f) => f.frame.timestamp < seekToSeconds * WEBCODECS_TIMESCALE,
+		(f) =>
+			f.frame.timestamp < firstFrameTime + seekToSeconds * WEBCODECS_TIMESCALE,
 	);
 
 	return hasFramesAfter && hasFramesBefore;
@@ -69,6 +78,7 @@ export const isSeekAchieved = ({
 
 export const getGroupOfIntendedSeek = (
 	frameDatabase: FrameDatabase,
+	firstFrameTime: number,
 	simulatedSeekTimestampInSeconds: number,
 ) => {
 	const group = frameDatabase
@@ -77,7 +87,8 @@ export const getGroupOfIntendedSeek = (
 			(g) =>
 				Math.abs(
 					g.startingTimestamp -
-						simulatedSeekTimestampInSeconds * WEBCODECS_TIMESCALE,
+						(firstFrameTime +
+							simulatedSeekTimestampInSeconds * WEBCODECS_TIMESCALE),
 				) <
 				0.1 * WEBCODECS_TIMESCALE,
 		);

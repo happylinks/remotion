@@ -9,6 +9,7 @@ export const makePlaybackState = ({
 	drawFrame: (frame: VideoFrame) => void;
 }) => {
 	let currentTime = 0;
+	let firstFrameTime = 0;
 	let playing = false;
 	let playTimeout: NodeJS.Timeout | null = null;
 	const emitter = new PlayerEmitter();
@@ -36,6 +37,18 @@ export const makePlaybackState = ({
 		}
 	};
 
+	const setFirstFrameTime = (time: number) => {
+		firstFrameTime = time;
+	};
+
+	const getFirstFrameTime = () => {
+		return firstFrameTime;
+	};
+
+	const getInternalCurrentTime = () => {
+		return firstFrameTime + currentTime;
+	};
+
 	const emitFrame = (frame: VideoFrame) => {
 		if (lastFrameDrawn === frame.timestamp) {
 			return;
@@ -46,9 +59,12 @@ export const makePlaybackState = ({
 	};
 
 	const loop = () => {
-		const nextFrame = frameDatabase.getNextFrameForTimestamp(currentTime, true);
+		const nextFrame = frameDatabase.getNextFrameForTimestamp(
+			getInternalCurrentTime(),
+			true,
+		);
 		if (!nextFrame) {
-			throw new Error('No frame found for time');
+			throw new Error('No frame found for time: ' + getInternalCurrentTime());
 		}
 
 		return setTimeout(
@@ -58,18 +74,18 @@ export const makePlaybackState = ({
 				}
 
 				emitFrame(nextFrame.frame);
-				setCurrentTime(nextFrame.frame.timestamp);
+				setCurrentTime(nextFrame.frame.timestamp - firstFrameTime);
 				nextFrame.frame.close();
 
 				loop();
 			},
-			(nextFrame.frame.timestamp - getCurrentTime()) / 1000,
+			(nextFrame.frame.timestamp - firstFrameTime - getCurrentTime()) / 1000,
 		);
 	};
 
 	const drawImmediately = () => {
 		const nextFrame = frameDatabase.getNextFrameForTimestamp(
-			currentTime,
+			getInternalCurrentTime(),
 			false,
 		);
 
@@ -95,6 +111,9 @@ export const makePlaybackState = ({
 	return {
 		setCurrentTime,
 		getCurrentTime,
+		setFirstFrameTime,
+		getFirstFrameTime,
+		getInternalCurrentTime,
 		isPlaying,
 		pause,
 		play,

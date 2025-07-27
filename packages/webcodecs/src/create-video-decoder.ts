@@ -89,6 +89,7 @@ export const internalCreateVideoDecoder = ({
 		);
 	}
 
+	console.log('[WebCodecs] Configuring video decoder', config);
 	videoDecoder.configure(config);
 
 	const decode = async (sample: EncodedVideoChunkInit | EncodedVideoChunk) => {

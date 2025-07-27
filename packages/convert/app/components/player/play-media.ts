@@ -66,6 +66,7 @@ export const playMedia = ({
 		onDimensions,
 		onDurationInSeconds,
 		onVideoTrack: ({track}) => {
+			console.log('Video track', track);
 			let loopIteration = 0;
 			decoder = createVideoDecoder({
 				onError: (err) => {
@@ -73,6 +74,12 @@ export const playMedia = ({
 					mpController.abort();
 				},
 				onFrame: (frame) => {
+					// Some files can start with a frame that doesn't start at 0.
+					// Example: https://test-streams.mux.dev/x36xhzz/url_6/193039199_mp4_h264_aac_hq_7.m3u8
+					if (frameDatabase.getLength() === 0) {
+						playback.setFirstFrameTime(frame.timestamp);
+					}
+
 					const desiredSeek = seek.getDesiredSeek();
 
 					if (desiredSeek) {
@@ -96,6 +103,7 @@ export const playMedia = ({
 						if (
 							isSeekAchieved({
 								frameDatabase,
+								firstFrameTime: playback.getFirstFrameTime(),
 								seekToSeconds: desiredSeek.getDesired(),
 							})
 						) {
@@ -133,6 +141,7 @@ export const playMedia = ({
 					return;
 				}
 
+				console.log('Decoding sample', sample);
 				await decoder!.decode(sample);
 				if (wasReset()) {
 					return;
@@ -180,10 +189,25 @@ export const playMedia = ({
 			return playback.getCurrentTime();
 		},
 		seek: async (time: number) => {
+			console.log('[PlayMedia] Seeking to', time);
 			playback.setCurrentTime(time * WEBCODECS_TIMESCALE);
 
 			// If the right frame is already in the database, we can draw it immediately
-			if (isSeekAchieved({frameDatabase, seekToSeconds: time})) {
+			console.log(
+				'isSeekAchieved',
+				isSeekAchieved({
+					frameDatabase,
+					firstFrameTime: playback.getFirstFrameTime(),
+					seekToSeconds: time,
+				}),
+			);
+			if (
+				isSeekAchieved({
+					frameDatabase,
+					firstFrameTime: playback.getFirstFrameTime(),
+					seekToSeconds: time,
+				})
+			) {
 				seek.clearSeek();
 				mpController.resume();
 				playback.drawImmediately();
@@ -191,20 +215,33 @@ export const playMedia = ({
 			}
 
 			const simulatedSeek = await mpController.simulateSeek(time);
+			console.log('simulatedSeek', simulatedSeek);
 
 			if (simulatedSeek.type === 'do-seek') {
-				const group = getGroupOfIntendedSeek(
-					frameDatabase,
+				console.log(
+					'get group at',
+					playback.getFirstFrameTime(),
 					simulatedSeek.timeInSeconds,
 				);
+				console.log('frameDatabase', frameDatabase);
+				const group = getGroupOfIntendedSeek(
+					frameDatabase,
+					playback.getFirstFrameTime(),
+					simulatedSeek.timeInSeconds,
+				);
+				console.log('group', group);
+				console.log('lastKeyframeTimestamp', lastKeyframeTimestamp);
 				if (group && group.startingTimestamp === lastKeyframeTimestamp) {
 					// we are in the same group, don't seek yet! maybe we can just wait
 					const lastFrameInput = decoder!.getMostRecentSampleInput();
 
 					// all frames are before the seek, we can just wait
-					if (lastFrameInput && lastFrameInput < time * WEBCODECS_TIMESCALE) {
+					if (
+						lastFrameInput &&
+						lastFrameInput < playback.getInternalCurrentTime()
+					) {
 						frameDatabase.clearFramesBeforeTimestampFromGroup({
-							deleteFramesBeforeTimestamp: time * WEBCODECS_TIMESCALE,
+							deleteFramesBeforeTimestamp: playback.getInternalCurrentTime(),
 							groupStartingTimestamp: group.startingTimestamp,
 						});
 						seek.setSeekWithoutMediaParserSeek(time);
@@ -221,7 +258,7 @@ export const playMedia = ({
 
 			// was not able to simulate seek, I guess we just force the seek
 			frameDatabase.clearDatabase();
-			seek.queueSeek(time, frameDatabase);
+			seek.queueSeek(playback.getFirstFrameTime(), time, frameDatabase);
 		},
 		addEventListener: playback.emitter.addEventListener,
 		removeEventListener: playback.emitter.removeEventListener,

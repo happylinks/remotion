@@ -47,7 +47,10 @@ export const useThumbnailAndWaveform = ({
 					waveform.setDuration(dur);
 				}
 			},
-			onAudioTrack: async ({track}) => {
+			/*
+			 *  TODO: Failed to execute 'decode' on 'AudioDecoder': Cannot call 'decode' on a closed codec.
+			 * onAudioTrack: async ({track}) => {
+				console.log('Audio track', track);
 				if (typeof AudioDecoder === 'undefined') {
 					return null;
 				}
@@ -98,7 +101,7 @@ export const useThumbnailAndWaveform = ({
 				return (sample) => {
 					decoder.decode(new EncodedAudioChunk(sample));
 				};
-			},
+			},*/
 			onVideoTrack: async ({track, container}) => {
 				if (typeof VideoDecoder === 'undefined') {
 					return null;

@@ -21,10 +21,15 @@ export const throttledSeek = (releaseSeek: (time: number) => void) => {
 	let currentSeek: Seek | null = null;
 
 	return {
-		queueSeek: (seek: number, frameDatabase: FrameDatabase) => {
+		queueSeek: (
+			firstFrameTime: number,
+			seek: number,
+			frameDatabase: FrameDatabase,
+		) => {
+			console.log('queueSeek', firstFrameTime, seek, currentSeek);
 			if (currentSeek !== null) {
 				currentSeek.replaceTimestamp(seek);
-				if (isSeekInfeasible(frameDatabase, seek)) {
+				if (isSeekInfeasible(frameDatabase, firstFrameTime, seek)) {
 					releaseSeek(currentSeek.getDesired());
 				}
 

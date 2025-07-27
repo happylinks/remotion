@@ -282,6 +282,7 @@ export const makeFrameDatabase = () => {
 		clearGroup,
 		clearDatabase,
 		emitter,
+		getLength,
 	};
 };
 
